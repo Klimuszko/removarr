@@ -35,4 +35,4 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/removarr:latest
+            ghcr.io/klimuszko/removarr:latest
