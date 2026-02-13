@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.env
+data/
+removarr_data/
+web/node_modules/
+web/dist/
+.vscode/
+.idea/

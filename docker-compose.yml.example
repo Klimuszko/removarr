@@ -1,0 +1,19 @@
+services:
+  removarr:
+    image: removarr:latest
+    container_name: removarr
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8765:8765"
+    environment:
+      REMOVARR_SECRET_KEY: "PASTE_FERNET_KEY_HERE"   # REQUIRED
+      REMOVARR_WEBHOOK_TOKEN: "change-me-webhook"
+      REMOVARR_DB_URL: "sqlite:///./data/removarr.db"
+      REMOVARR_VERIFY_IN_PLEX: "false"
+      PLEX_BASE_URL: "http://plex:32400"
+      PLEX_SERVER_TOKEN: "PASTE_PLEX_SERVER_TOKEN_HERE"
+    volumes:
+      - ./removarr_data:/app/data
+    restart: unless-stopped

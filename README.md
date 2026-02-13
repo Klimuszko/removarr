@@ -1,31 +1,41 @@
-# Removarr
+# Removarr (Fullstack)
 
-Removarr is a self-hosted service that removes items from **Plex Watchlists** once **Sonarr/Radarr** report a **successful import** (`eventType=Download`). It’s designed for shared Plex libraries where multiple Plex accounts add to Watchlist and you want entries to disappear automatically after the item is actually in your library.
+Self-hosted service that removes items from **Plex Watchlists** when **Radarr/Sonarr** report that an item is **imported** (i.e., present in Sonarr/Radarr library).
 
-✅ Web UI included  
-✅ First-run admin setup (username + password)  
-✅ Add Plex accounts via **Plex OAuth** or **manual token**  
-✅ Daily account status checks + instant invalidation on auth errors  
-✅ Docker / GHCR friendly
+Includes a built-in **web UI** (SPA) to configure everything.
 
----
+## Key behavior
 
-## How it works
+- Webhook events are **processed only** when `eventType == "Download"` (import done).  
+  Other events (e.g. `Grab`) are ignored.
+- Plex accounts can be linked via:
+  - **Plex OAuth / PIN flow** (recommended) — no manual token handling
+  - **Manual token** (fallback)
+- Account link **status**:
+  - Verified **once per day** in the background
+  - Also flips to **INVALID** immediately if Removarr starts receiving auth errors during normal operations
 
-- Sonarr/Radarr sends a webhook when an item is **imported** (not when download starts).
-- Removarr checks all linked Plex accounts and removes the matching item from their Watchlists.
-- If a Plex token becomes invalid, Removarr marks the account as `invalid` (visible in UI).
+## First-run admin setup
 
----
+On the first run, open the UI and create the **admin account (username + password)**.
+After that, you must login to manage settings.
 
-## Quick start (Docker)
+## Run with Docker
 
-### 1) Required env vars
+See `docker-compose.yml.example`.
 
-- `REMOVARR_SECRET_KEY` — encrypts stored Plex tokens (Fernet key)
-- `REMOVARR_WEBHOOK_TOKEN` — protects webhook endpoints
-- `REMOVARR_DB_URL` — database url (SQLite by default)
+### Required env vars
 
-Generate your own Fernet key:
-```bash
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+- `REMOVARR_SECRET_KEY` (required) Fernet key used to encrypt Plex tokens at rest  
+  Generate: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
+
+### Configure Radarr/Sonarr webhooks
+
+- URL:
+  - `http://removarr:8765/webhook/radarr`
+  - `http://removarr:8765/webhook/sonarr`
+- Header:
+  - `X-Removarr-Webhook-Token: <REMOVARR_WEBHOOK_TOKEN>`
+
+## License
+MIT
