@@ -46,11 +46,23 @@ def get_db():
     finally:
         db.close()
 
-def require_auth(removarr_session: Optional[str] = Cookie(default=None), db: Session = Depends(get_db)):
-    if not removarr_session:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    if not validate_session(db, removarr_session):
-        raise HTTPException(status_code=401, detail="Unauthorized")
+def require_auth(
+    authorization: Optional[str] = Header(default=None),
+    removarr_session: Optional[str] = Cookie(default=None),
+    db: Session = Depends(get_db),
+):
+    # Prefer Bearer token (works even if browser blocks cookies)
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+        if token and validate_session(db, token):
+            return
+
+    # Fallback to cookie-based session
+    if removarr_session and validate_session(db, removarr_session):
+        return
+
+    raise HTTPException(status_code=401, detail="Unauthorized")
+
 
 def require_webhook(x_removarr_webhook_token: Optional[str] = Header(None)):
     if x_removarr_webhook_token != settings.webhook_token:
@@ -90,8 +102,7 @@ def auth_setup(payload: SetupAdmin, db: Session = Depends(get_db)):
         create_admin(db, payload.username, payload.password)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return {"ok": True}
-
+    return {"ok": True, "token": token}
 @app.post("/api/auth/login")
 def auth_login(payload: LoginReq, response: Response, db: Session = Depends(get_db)):
     try:
@@ -108,15 +119,13 @@ def auth_login(payload: LoginReq, response: Response, db: Session = Depends(get_
         max_age=60 * 60 * 24 * 30,
         path="/",
     )
-    return {"ok": True}
-
+    return {"ok": True, "token": token}
 @app.post("/api/auth/logout", dependencies=[Depends(require_auth)])
 def auth_logout(response: Response, removarr_session: Optional[str] = Cookie(default=None), db: Session = Depends(get_db)):
     if removarr_session:
         do_logout(db, removarr_session)
     response.delete_cookie(COOKIE_NAME, path="/")
-    return {"ok": True}
-
+    return {"ok": True, "token": token}
 # ---- Plex OAuth connect ----
 @app.post("/api/plex/oauth/start", response_model=OAuthStartRes, dependencies=[Depends(require_auth)])
 def plex_oauth_start(payload: OAuthStartReq):

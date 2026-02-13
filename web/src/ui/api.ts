@@ -20,8 +20,15 @@ export type LogsItem = {
   details: string[]
 }
 
+
+function authHeaders() {
+  const token = localStorage.getItem('removarr_token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 async function jfetch(path: string, init?: RequestInit) {
-  const r = await fetch(path, { credentials: 'include', ...init })
+  const headers = { ...(init?.headers || {}), ...authHeaders() }
+  const r = await fetch(path, { credentials: 'include', ...init, headers })
   if (!r.ok) {
     const t = await r.text()
     throw new Error(t)
@@ -47,14 +54,17 @@ export async function setupAdmin(username: string, password: string) {
 }
 
 export async function login(username: string, password: string) {
-  return jfetch('/api/auth/login', {
+  const res = await jfetch('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   })
+  if (res?.token) localStorage.setItem('removarr_token', res.token)
+  return res
 }
 
 export async function logout() {
+  localStorage.removeItem('removarr_token')
   return jfetch('/api/auth/logout', { method: 'POST' })
 }
 

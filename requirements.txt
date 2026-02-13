@@ -4,5 +4,4 @@ pydantic==2.9.2
 pydantic-settings==2.6.1
 SQLAlchemy==2.0.36
 cryptography==44.0.0
-PlexAPI==4.15.16
-
+python-plexapi==4.15.16

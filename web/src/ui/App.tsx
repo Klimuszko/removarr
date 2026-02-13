@@ -99,6 +99,7 @@ export default function App() {
     setErr('')
     try {
       await logout()
+      localStorage.removeItem('removarr_token')
       setAuthed(false)
       setInfoState(null)
       setAccounts([])
