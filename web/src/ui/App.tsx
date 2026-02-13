@@ -53,8 +53,7 @@ export default function App() {
     }
     catch (e: any) {
       setAuthed(false)
-      const msg = String(e?.message || e)
-      setErr(msg)
+      setErr(String(e?.message || e))
     }
   }
 
@@ -88,20 +87,18 @@ export default function App() {
   }
 
   async function onLogin() {
-
-setErr('')
-try {
-  await login(loginUser.trim(), loginPass)
-  setLoginPass('')
-  // verify auth immediately
-  await authPing()
-  await refreshProtected()
-} catch (e: any) {
-  setErr(String(e?.message || 'Błędny login lub problem z autoryzacją.'))
-}
+  setErr('')
+  try {
+    await login(loginUser.trim(), loginPass)
+    setLoginPass('')
+    await authPing()
+    await refreshProtected()
+  } catch (e: any) {
+    setErr(String(e?.message || 'Błędny login lub problem z autoryzacją.'))
   }
+}
 
-  async function onLogout() {
+async function onLogout() {
     setErr('')
     try {
       await logout()

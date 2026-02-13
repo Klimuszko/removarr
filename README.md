@@ -39,3 +39,7 @@ See `docker-compose.yml.example`.
 
 ## License
 MIT
+
+
+### Debug
+- `GET /api/auth/ping` returns 200 only when authenticated.
