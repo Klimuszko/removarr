@@ -30,39 +30,13 @@ engine = make_engine(settings.db_url)
 SessionLocal = make_session_factory(engine)
 Base.metadata.create_all(bind=engine)
 
-
-def _sqlite_migrate():
-    try:
-        if not settings.db_url.lower().startswith("sqlite"):
-            return
-        from sqlalchemy import text as sql_text
-        with engine.connect() as conn:
-            cols = conn.execute(sql_text("PRAGMA table_info(plex_accounts);")).fetchall()
-            existing = {c[1] for c in cols} if cols else set()
-            to_add = [
-                ("auth_method", "VARCHAR(30)", "'manual'"),
-                ("status", "VARCHAR(30)", "'unknown'"),
-                ("last_check_at", "DATETIME", "NULL"),
-                ("last_ok_at", "DATETIME", "NULL"),
-                ("last_error", "VARCHAR(1000)", "NULL"),
-            ]
-            for name, typ, default in to_add:
-                if name in existing:
-                    continue
-                conn.execute(sql_text(f"ALTER TABLE plex_accounts ADD COLUMN {name} {typ} DEFAULT {default};"))
-            conn.commit()
-    except Exception:
-        return
-
-_sqlite_migrate()
-
 crypto = Crypto(settings.secret_key)
 plex_ops = PlexOps(settings.plex_base_url, settings.plex_server_token)
 logring = LogRing(maxlen=400)
 oauth_mgr = PlexOAuthManager()
 
 STATIC_DIR = Path(__file__).parent / "static"
-app = FastAPI(title="Removarr", version="0.4.3")
+app = FastAPI(title="Removarr", version="0.4.4")
 
 # ---- DB helpers ----
 def get_db():
@@ -128,7 +102,7 @@ def auth_setup(payload: SetupAdmin, db: Session = Depends(get_db)):
         create_admin(db, payload.username, payload.password)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return {"ok": True}
+    return {"ok": True, "token": token}
 @app.post("/api/auth/login")
 def auth_login(payload: LoginReq, response: Response, db: Session = Depends(get_db)):
     try:
@@ -145,14 +119,13 @@ def auth_login(payload: LoginReq, response: Response, db: Session = Depends(get_
         max_age=60 * 60 * 24 * 30,
         path="/",
     )
-    return {"ok": True}
-
+    return {"ok": True, "token": token}
 @app.post("/api/auth/logout", dependencies=[Depends(require_auth)])
 def auth_logout(response: Response, removarr_session: Optional[str] = Cookie(default=None), db: Session = Depends(get_db)):
     if removarr_session:
         do_logout(db, removarr_session)
     response.delete_cookie(COOKIE_NAME, path="/")
-    return {"ok": True}
+    return {"ok": True, "token": token}
 
 
 @app.get("/api/auth/ping", dependencies=[Depends(require_auth)])

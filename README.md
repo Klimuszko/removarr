@@ -41,5 +41,5 @@ See `docker-compose.yml.example`.
 MIT
 
 
-### Debug
-- `GET /api/auth/ping` returns 200 only when authenticated.
+### Fixes
+- Session expiry check compares datetimes as naive UTC to avoid SQLite tz mismatch.

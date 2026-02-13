@@ -68,12 +68,21 @@ def logout(db: Session, token: str) -> None:
     db.execute(delete(SessionToken).where(SessionToken.token == token))
     db.commit()
 
+def _to_utc_naive(dt: datetime) -> datetime:
+    # SQLite often returns naive datetimes; others may return tz-aware.
+    if dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
 def validate_session(db: Session, token: str) -> bool:
-    now = datetime.now(timezone.utc)
+    # Compare as naive UTC to avoid "offset-naive vs offset-aware" errors.
+    now = datetime.utcnow()
     row = db.execute(select(SessionToken).where(SessionToken.token == token)).scalars().first()
     if not row:
         return False
-    if row.expires_at <= now:
+
+    expires = _to_utc_naive(row.expires_at)
+    if expires <= now:
         db.execute(delete(SessionToken).where(SessionToken.token == token))
         db.commit()
         return False
