@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import {
   addAccount, deleteAccount, health, info, listAccounts, logs,
   type Account, type LogsItem, authStatus, setupAdmin, login, logout,
-  oauthStart, oauthStatus
+  oauthStart, oauthStatus, authPing
 } from './api'
 
 function tsToLocal(ts: number) {
@@ -50,8 +50,11 @@ export default function App() {
       setAccounts(await listAccounts())
       setLogItems((await logs()).items)
       setAuthed(true)
-    } catch {
+    }
+    catch (e: any) {
       setAuthed(false)
+      const msg = String(e?.message || e)
+      setErr(msg)
     }
   }
 
@@ -85,14 +88,17 @@ export default function App() {
   }
 
   async function onLogin() {
-    setErr('')
-    try {
-      await login(loginUser.trim(), loginPass)
-      setLoginPass('')
-      await refreshProtected()
-    } catch {
-      setErr('Błędny login lub hasło.')
-    }
+
+setErr('')
+try {
+  await login(loginUser.trim(), loginPass)
+  setLoginPass('')
+  // verify auth immediately
+  await authPing()
+  await refreshProtected()
+} catch (e: any) {
+  setErr(String(e?.message || 'Błędny login lub problem z autoryzacją.'))
+}
   }
 
   async function onLogout() {

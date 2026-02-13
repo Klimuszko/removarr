@@ -99,3 +99,7 @@ export async function oauthStart(): Promise<{ flow_id: string; url: string }> {
 export async function oauthStatus(flow_id: string): Promise<{ flow_id: string; status: string; message?: string; account_id?: number; label?: string }> {
   return jfetch(`/api/plex/oauth/status/${encodeURIComponent(flow_id)}`)
 }
+
+export async function authPing(): Promise<{ ok: boolean }> {
+  return jfetch('/api/auth/ping')
+}
