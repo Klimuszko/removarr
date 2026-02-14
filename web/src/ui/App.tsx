@@ -88,8 +88,8 @@ useEffect(() => {
   async function onSetup() {
     setErr('')
     try {
-      if (setupUser.trim().length < 3) { setErr('Username min 3 znaki.'); return }
-      if (setupPass.trim().length < 8) { setErr('Hasło min 8 znaków.'); return }
+      if (setupUser.trim().length < 3) { setErr('Username must be at least 3 characters.'); return }
+      if (setupPass.trim().length < 8) { setErr('Password min 8 znaków.'); return }
       await setupAdmin(setupUser.trim(), setupPass.trim())
       await refreshAuthStatus()
       await login(setupUser.trim(), setupPass.trim())
@@ -210,7 +210,7 @@ async function onLogout() {
       <div className="header">
         <div>
           <div className="h1">Removarr</div>
-          <div className="small">Remove from Plex Watchlist when Radarr/Sonarr IMPORT (eventType=Download).</div>
+          <div className="small">Remove from Plex Watchlist when Radarr/Sonarr import completes (On Import Complete).</div>
         </div>
         <div className="row">
           <span className="badge">
@@ -220,34 +220,42 @@ async function onLogout() {
           <span className="badge">
             Verify in Plex: {String(healthState?.verify_in_plex ?? '?')}
           </span>
-          {authed ? <button className="danger" onClick={onLogout}>Wyloguj</button> : null}
+          {authed ? <button className="danger" onClick={onLogout}>Log out</button> : null}
         </div>
       </div>
 
       {err ? <div className="card" style={{borderColor: 'rgba(255,92,92,0.35)'}}><b>Error:</b> <span className="mono">{err}</span></div> : null}
 
-      {hasAdmin === false ? (
+      
+{hasAdmin === null ? (
+  <div className="card">
+    <div className="cardTitle">Loading…</div>
+    <div className="small">Checking setup and authentication status.</div>
+  </div>
+) : null}
+
+{hasAdmin === false ? (
         <div className="card">
-          <div className="cardTitle">Pierwsze uruchomienie — utwórz konto admina</div>
-          <div className="small">Konto admina tworzy się tylko raz. Potem używasz logowania.</div>
+          <div className="cardTitle">First run — create admin account</div>
+          <div className="small">The admin account is created only once. After that, use the login form.</div>
           <div style={{height: 10}}></div>
           <div className="col">
             <input placeholder="Username" value={setupUser} onChange={e => setSetupUser(e.target.value)} />
-            <input type="password" placeholder="Hasło (min 8 znaków)" value={setupPass} onChange={e => setSetupPass(e.target.value)} />
-            <button onClick={onSetup}>Utwórz admina</button>
+            <input type="password" placeholder="Password (min 8 chars)" value={setupPass} onChange={e => setSetupPass(e.target.value)} />
+            <button onClick={onSetup}>Create admin</button>
           </div>
         </div>
       ) : null}
 
       {hasAdmin === true && !authed ? (
         <div className="card">
-          <div className="cardTitle">Logowanie</div>
-          <div className="small">Zaloguj się kontem admina, aby zarządzać Removarr.</div>
+          <div className="cardTitle">Login</div>
+          <div className="small">Log in with the admin account to manage Removarr.</div>
           <div style={{height: 10}}></div>
           <div className="col">
             <input placeholder="Username" value={loginUser} onChange={e => setLoginUser(e.target.value)} />
-            <input type="password" placeholder="Hasło" value={loginPass} onChange={e => setLoginPass(e.target.value)} />
-            <button onClick={onLogin}>Zaloguj</button>
+            <input type="password" placeholder="Password" value={loginPass} onChange={e => setLoginPass(e.target.value)} />
+            <button onClick={onLogin}>Log in</button>
           </div>
         </div>
       ) : null}
@@ -307,21 +315,21 @@ async function onLogout() {
 </div>
 
 <div className="card">
-              <div className="cardTitle">Połącz konto Plex</div>
-              <div className="small">Opcja zalecana: Plex OAuth (nie wklejasz tokena). Po połączeniu konto zostanie dodane automatycznie.</div>
+              <div className="cardTitle">Connect Plex account</div>
+              <div className="small">Recommended: Plex OAuth (no token pasting). After connecting, the account is added automatically.</div>
               <div style={{height: 10}}></div>
               <button onClick={onOauthConnect}>Connect with Plex</button>
               {oauthMsg ? <div className="footerNote">{oauthMsg}</div> : null}
             </div>
 
             <div className="card">
-              <div className="cardTitle">Dodaj konto Plex ręcznie</div>
-              <div className="small">Fallback: wklej token. Removarr sprawdzi token od razu.</div>
+              <div className="cardTitle">Add Plex account manually</div>
+              <div className="small">Fallback: paste a token. Removarr validates it immediately.</div>
               <div style={{height: 10}}></div>
               <div className="col">
                 <input placeholder="Label (np. Kuba)" value={label} onChange={e => setLabel(e.target.value)} />
                 <input className="mono" placeholder="Plex token (X-Plex-Token)" value={plexToken} onChange={e => setPlexToken(e.target.value)} />
-                <button onClick={onAddAccount}>Dodaj</button>
+                <button onClick={onAddAccount}>Add</button>
               </div>
             </div>
           </div>
@@ -344,7 +352,7 @@ async function onLogout() {
                 </thead>
                 <tbody>
                   {accounts.length === 0 ? (
-                    <tr><td colSpan={6} className="small">Brak kont. Dodaj po lewej.</td></tr>
+                    <tr><td colSpan={6} className="small">Brak kont. Add po lewej.</td></tr>
                   ) : accounts.map(a => (
                     <tr key={a.id}>
                       <td>
