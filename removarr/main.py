@@ -36,7 +36,7 @@ logring = LogRing(maxlen=400)
 oauth_mgr = PlexOAuthManager()
 
 STATIC_DIR = Path(__file__).parent / "static"
-app = FastAPI(title="Removarr", version="0.4.6")
+app = FastAPI(title="Removarr", version="0.4.7")
 
 # ---- DB helpers ----
 def get_db():
