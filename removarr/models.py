@@ -40,3 +40,14 @@ class SessionToken(Base):
     token: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     expires_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+    __table_args__ = (UniqueConstraint("key", name="uq_app_settings_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    key: Mapped[str] = mapped_column(String(120), nullable=False)
+    value: Mapped[str] = mapped_column(String(4000), nullable=False)
+
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

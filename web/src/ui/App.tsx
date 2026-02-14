@@ -2,12 +2,21 @@ import React, { useEffect, useState } from 'react'
 import {
   addAccount, deleteAccount, health, info, listAccounts, logs,
   type Account, type LogsItem, authStatus, setupAdmin, login, logout,
-  oauthStart, oauthStatus, authPing
+  oauthStart, oauthStatus, authPing, getWebhookToken, regenerateWebhookToken
 } from './api'
 
 function tsToLocal(ts: number) {
   const d = new Date(ts * 1000)
   return d.toLocaleString()
+}
+
+
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+  } catch {
+    // ignore
+  }
 }
 
 function isoToLocal(iso?: string | null) {
@@ -57,7 +66,12 @@ export default function App() {
     }
   }
 
-  useEffect(() => {
+  
+const [webhookToken, setWebhookToken] = useState<string>('')
+const [webhookTokenSource, setWebhookTokenSource] = useState<string>('')
+const [showRegenModal, setShowRegenModal] = useState(false)
+
+useEffect(() => {
     refreshHealth()
     refreshAuthStatus()
   }, [])
@@ -94,8 +108,16 @@ export default function App() {
     await authPing()
     await refreshProtected()
   } catch (e: any) {
-    setErr(String(e?.message || 'Błędny login lub problem z autoryzacją.'))
+    setErr(String(e?.message || 'Invalid credentials or authorization failed.'))
   }
+}
+
+
+async function onRegenerateWebhookToken() {
+  setShowRegenModal(false)
+  const res = await regenerateWebhookToken()
+  setWebhookToken(res.token)
+  setWebhookTokenSource('db')
 }
 
 async function onLogout() {
@@ -175,7 +197,7 @@ async function onLogout() {
   const webhookHeader = infoState?.webhook?.header || 'X-Removarr-Webhook-Token'
   const radarrPath = infoState?.webhook?.radarr_path || '/webhook/radarr'
   const sonarrPath = infoState?.webhook?.sonarr_path || '/webhook/sonarr'
-  const acceptedEvent = infoState?.webhook?.accepted_eventType || 'Download'
+  const recommendedEvent = 'On Import Complete'
 
   const statusDot = (s: string) => {
     if (s === 'ok') return 'ok'
@@ -202,7 +224,7 @@ async function onLogout() {
         </div>
       </div>
 
-      {err ? <div className="card" style={{borderColor: 'rgba(255,92,92,0.35)'}}><b>Błąd:</b> <span className="mono">{err}</span></div> : null}
+      {err ? <div className="card" style={{borderColor: 'rgba(255,92,92,0.35)'}}><b>Error:</b> <span className="mono">{err}</span></div> : null}
 
       {hasAdmin === false ? (
         <div className="card">
@@ -234,26 +256,57 @@ async function onLogout() {
         <div className="grid">
           <div className="col">
             <div className="card">
-              <div className="cardTitle">Webhook endpoints</div>
-              <div className="small">Radarr/Sonarr webhook musi wysyłać <span className="mono">eventType={acceptedEvent}</span> — inne eventy są ignorowane.</div>
-              <div style={{height: 10}}></div>
-              <div className="col">
-                <div>
-                  <div className="small">Radarr URL</div>
-                  <div className="mono">{location.origin}{radarrPath}</div>
-                </div>
-                <div>
-                  <div className="small">Sonarr URL</div>
-                  <div className="mono">{location.origin}{sonarrPath}</div>
-                </div>
-                <div>
-                  <div className="small">Wymagany nagłówek</div>
-                  <div className="mono">{webhookHeader}: &lt;REMOVARR_WEBHOOK_TOKEN&gt;</div>
-                </div>
-              </div>
-            </div>
+  <div className="cardTitle">Webhook endpoints</div>
+  <div className="small">
+    In <span className="mono">Sonarr</span> / <span className="mono">Radarr</span> add a <span className="mono">Webhook</span> connection.
+    Enable event: <span className="mono">{recommendedEvent}</span>.
+  </div>
+  <div className="small" style={{ marginTop: 6 }}>
+    Set the header below (name + token). Without it, requests are rejected.
+  </div>
 
-            <div className="card">
+  <div style={{ height: 12 }} />
+
+  <div className="col">
+    <div>
+      <div className="small">Radarr URL</div>
+      <div className="pillInput">
+        <div className="mono" style={{ flex: 1, wordBreak: 'break-all' }}>{location.origin}{radarrPath}</div>
+        <button className="copyBtn" onClick={() => copyText(location.origin + radarrPath)}>Copy</button>
+      </div>
+    </div>
+
+    <div>
+      <div className="small">Sonarr URL</div>
+      <div className="pillInput">
+        <div className="mono" style={{ flex: 1, wordBreak: 'break-all' }}>{location.origin}{sonarrPath}</div>
+        <button className="copyBtn" onClick={() => copyText(location.origin + sonarrPath)}>Copy</button>
+      </div>
+    </div>
+
+    <div>
+      <div className="small">Header name</div>
+      <div className="pillInput">
+        <div className="mono" style={{ flex: 1 }}>{webhookHeader}</div>
+        <button className="copyBtn" onClick={() => copyText(webhookHeader)}>Copy</button>
+      </div>
+    </div>
+
+    <div>
+      <div className="small">Header token</div>
+      <div className="pillInput">
+        <div className="mono" style={{ flex: 1, wordBreak: 'break-all' }}>{webhookToken || '—'}</div>
+        <button className="copyBtn" onClick={() => copyText(webhookToken)} disabled={!webhookToken}>Copy</button>
+      </div>
+      <div className="row" style={{ marginTop: 8 }}>
+        <button onClick={() => setShowRegenModal(true)}>Generate / Save</button>
+        <span className="small">Source: <span className="mono">{webhookTokenSource}</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="card">
               <div className="cardTitle">Połącz konto Plex</div>
               <div className="small">Opcja zalecana: Plex OAuth (nie wklejasz tokena). Po połączeniu konto zostanie dodane automatycznie.</div>
               <div style={{height: 10}}></div>
@@ -314,7 +367,7 @@ async function onLogout() {
             </div>
 
             <div className="card">
-              <div className="cardTitle">Ostatnie webhooki</div>
+              <div className="cardTitle">Recent webhooks</div>
               <div className="small">Eventy inne niż <span className="mono">{acceptedEvent}</span> będą widoczne jako „Ignored”.</div>
               <div style={{height: 10}}></div>
               <table className="table">
@@ -347,7 +400,7 @@ async function onLogout() {
 
               {logItems.length > 0 ? (
                 <div className="footerNote">
-                  Szczegóły (ostatni):<br/>
+                  Details (latest):<br/>
                   <div className="mono" style={{whiteSpace:'pre-wrap'}}>{(logItems[0].details || []).join("\n")}</div>
                 </div>
               ) : null}
@@ -355,6 +408,21 @@ async function onLogout() {
           </div>
         </div>
       ) : null}
+
+{showRegenModal ? (
+  <div className="modalOverlay" onClick={() => setShowRegenModal(false)}>
+    <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="cardTitle">Regenerate webhook token?</div>
+      <div className="small">
+        Continuing will generate a new token and save it. Existing Sonarr/Radarr webhooks will stop working until you update them.
+      </div>
+      <div className="modalActions">
+        <button className="danger" onClick={() => setShowRegenModal(false)}>Cancel</button>
+        <button onClick={onRegenerateWebhookToken}>Continue</button>
+      </div>
+    </div>
+  </div>
+) : null}
     </div>
   )
 }

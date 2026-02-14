@@ -15,7 +15,7 @@ from sqlalchemy import select, delete, update
 
 from .config import settings
 from .db import Base, make_engine, make_session_factory
-from .models import PlexAccount
+from .models import PlexAccount, AppSetting
 from .crypto import Crypto
 from .schemas import (
     AccountCreate, AccountOut, WebhookResult, SetupAdmin, LoginReq,
@@ -36,7 +36,7 @@ logring = LogRing(maxlen=400)
 oauth_mgr = PlexOAuthManager()
 
 STATIC_DIR = Path(__file__).parent / "static"
-app = FastAPI(title="Removarr", version="0.4.7")
+app = FastAPI(title="Removarr", version="0.4.8")
 
 # ---- DB helpers ----
 def get_db():
@@ -64,8 +64,12 @@ def require_auth(
     raise HTTPException(status_code=401, detail="Unauthorized")
 
 
-def require_webhook(x_removarr_webhook_token: Optional[str] = Header(None)):
-    if x_removarr_webhook_token != settings.webhook_token:
+def require_webhook(
+    x_removarr_webhook_token: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    current = get_setting(db, "webhook_token") or settings.webhook_token
+    if x_removarr_webhook_token != current:
         raise HTTPException(status_code=401, detail="Unauthorized (webhook token)")
 
 def _dt_to_iso(dt: datetime | None) -> str | None:
@@ -90,6 +94,19 @@ def _account_out(a: PlexAccount) -> AccountOut:
 @app.get("/health")
 def health():
     return {"ok": True, "verify_in_plex": settings.verify_in_plex}
+
+def get_setting(db: Session, key: str) -> Optional[str]:
+    row = db.execute(select(AppSetting).where(AppSetting.key == key)).scalars().first()
+    return row.value if row else None
+
+def set_setting(db: Session, key: str, value: str) -> None:
+    row = db.execute(select(AppSetting).where(AppSetting.key == key)).scalars().first()
+    if row:
+        row.value = value
+    else:
+        row = AppSetting(key=key, value=value)
+        db.add(row)
+    db.commit()
 
 # ---- Auth ----
 @app.get("/api/auth/status")
@@ -183,12 +200,26 @@ def info():
             "radarr_path": "/webhook/radarr",
             "sonarr_path": "/webhook/sonarr",
             "header": "X-Removarr-Webhook-Token",
-            "accepted_eventType": "Download",
+            "recommended_sonarr_event": "On Import Complete",
+            "recommended_radarr_event": "On Import Complete",
         },
         "verify_in_plex": settings.verify_in_plex,
         "plex_base_url_set": bool(settings.plex_base_url),
         "plex_server_token_set": bool(settings.plex_server_token),
     }
+
+
+@app.get("/api/settings/webhook-token", dependencies=[Depends(require_auth)])
+def get_webhook_token(db: Session = Depends(get_db)):
+    token = get_setting(db, "webhook_token") or settings.webhook_token
+    source = "db" if get_setting(db, "webhook_token") else "env"
+    return {"token": token, "source": source}
+
+@app.post("/api/settings/webhook-token/regenerate", dependencies=[Depends(require_auth)])
+def regenerate_webhook_token(db: Session = Depends(get_db)):
+    token = secrets.token_urlsafe(32)
+    set_setting(db, "webhook_token", token)
+    return {"token": token}
 
 @app.get("/api/logs", dependencies=[Depends(require_auth)])
 def logs():

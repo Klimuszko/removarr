@@ -103,3 +103,12 @@ export async function oauthStatus(flow_id: string): Promise<{ flow_id: string; s
 export async function authPing(): Promise<{ ok: boolean }> {
   return jfetch('/api/auth/ping')
 }
+
+
+export async function getWebhookToken(): Promise<{ token: string; source: string }> {
+  return jfetch('/api/settings/webhook-token')
+}
+
+export async function regenerateWebhookToken(): Promise<{ token: string }> {
+  return jfetch('/api/settings/webhook-token/regenerate', { method: 'POST' })
+}
