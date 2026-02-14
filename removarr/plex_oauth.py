@@ -20,7 +20,6 @@ class PlexOAuthManager:
 
     def start(self, flow_id: str) -> str:
         pl = MyPlexPinLogin(oauth=True)
-        pl.run(timeout=180)  # allow 3 minutes
         url = pl.oauthUrl()
         with self._lock:
             self._flows[flow_id] = OAuthFlow(id=flow_id, created_at=time.time(), login=pl)
@@ -33,6 +32,12 @@ class PlexOAuthManager:
             return "expired", None
 
         pl = flow.login
+        # hard-expire after 3 minutes
+        if time.time() - flow.created_at > 180:
+            with self._lock:
+                self._flows.pop(flow_id, None)
+            return "expired", None
+
         try:
             if pl.checkLogin():
                 token = pl.token
