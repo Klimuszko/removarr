@@ -198,6 +198,7 @@ async function onLogout() {
   const radarrPath = infoState?.webhook?.radarr_path || '/webhook/radarr'
   const sonarrPath = infoState?.webhook?.sonarr_path || '/webhook/sonarr'
   const recommendedEvent = 'On Import Complete'
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
 
   const statusDot = (s: string) => {
     if (s === 'ok') return 'ok'
@@ -279,16 +280,16 @@ async function onLogout() {
     <div>
       <div className="small">Radarr URL</div>
       <div className="pillInput">
-        <div className="mono" style={{ flex: 1, wordBreak: 'break-all' }}>{location.origin}{radarrPath}</div>
-        <button className="copyBtn" onClick={() => copyText(location.origin + radarrPath)}>Copy</button>
+        <div className="mono" style={{ flex: 1, wordBreak: 'break-all' }}>{origin}{radarrPath}</div>
+        <button className="copyBtn" onClick={() => copyText(origin + radarrPath)}>Copy</button>
       </div>
     </div>
 
     <div>
       <div className="small">Sonarr URL</div>
       <div className="pillInput">
-        <div className="mono" style={{ flex: 1, wordBreak: 'break-all' }}>{location.origin}{sonarrPath}</div>
-        <button className="copyBtn" onClick={() => copyText(location.origin + sonarrPath)}>Copy</button>
+        <div className="mono" style={{ flex: 1, wordBreak: 'break-all' }}>{origin}{sonarrPath}</div>
+        <button className="copyBtn" onClick={() => copyText(origin + sonarrPath)}>Copy</button>
       </div>
     </div>
 
