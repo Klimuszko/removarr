@@ -64,8 +64,8 @@ class PlexOps:
                 continue
         return False
 
-    def _discover_watchlist_xml(self, user_token: str) -> str:
-    # Plex migrated Watchlist APIs from metadata.provider.plex.tv to discover.provider.plex.tv
+def _discover_watchlist_xml(self, user_token: str) -> str:
+    # Plex migrated Watchlist APIs from metadata.provider.plex.tv to discover.provider.plex.tv.
     # Using direct HTTP avoids PlexAPI breakages.
     base = "https://discover.provider.plex.tv"
     url = f"{base}/library/sections/watchlist/all"
@@ -105,9 +105,8 @@ def remove_from_watchlist_if_present(
     except Exception as e:
         return False, f"Failed to parse watchlist XML: {e}"
 
-    # Entries are usually <Video> or <Directory> nodes with attributes incl. ratingKey, title, year, guid
-    candidates = list(root.iter())
-    for node in candidates:
+    # Iterate all nodes; watchlist entries typically have ratingKey + title.
+    for node in root.iter():
         rk = node.attrib.get("ratingKey") or node.attrib.get("ratingkey")
         if not rk:
             continue
@@ -116,12 +115,9 @@ def remove_from_watchlist_if_present(
         node_year = node.attrib.get("year")
         guid = node.attrib.get("guid", "") or ""
 
-        # guid examples: "plex://movie/5d7768ba96b655001f3d9b7a?lang=en" or provider guids
-        # There are also nested <Guid id="..."> nodes.
         gids = {"raw": guid}
         # extract ids from guid string + nested Guid tags
         if guid:
-            # reuse existing helper by faking guids list shape when possible
             try:
                 tmp = extract_guid_ids([{"id": guid}])  # type: ignore[arg-type]
                 gids.update(tmp)
@@ -137,6 +133,7 @@ def remove_from_watchlist_if_present(
                 except Exception:
                     continue
 
+        # Prefer exact id matches
         if tmdb_id and (gids.get("tmdb") == str(tmdb_id)):
             try:
                 self._discover_remove_watchlist(user_token, rk)
