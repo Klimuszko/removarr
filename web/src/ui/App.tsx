@@ -377,7 +377,7 @@ async function onLogout() {
 
             <div className="card">
               <div className="cardTitle">Recent webhooks</div>
-              <div className="small">Eventy inne niż <span className="mono">{acceptedEvent}</span> będą widoczne jako „Ignored”.</div>
+              <div className="small">Eventy inne niż <span className="mono">{recommendedEvent}</span> będą widoczne jako „Ignored”.</div>
               <div style={{height: 10}}></div>
               <table className="table">
                 <thead>
