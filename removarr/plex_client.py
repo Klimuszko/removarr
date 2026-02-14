@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from typing import Optional, Tuple
+
+import requests
+import xml.etree.ElementTree as ET
 from plexapi.myplex import MyPlexAccount
 from plexapi.server import PlexServer
 
@@ -61,24 +64,107 @@ class PlexOps:
                 continue
         return False
 
-    def remove_from_watchlist_if_present(self, user_token: str, tmdb_id: Optional[int], tvdb_id: Optional[int], title: str, year: Optional[int]) -> Tuple[bool, str]:
-        acct = self.account(user_token)
-        items = acct.watchlist()
-        target_title = norm_title(title)
+    def _discover_watchlist_xml(self, user_token: str) -> str:
+    # Plex migrated Watchlist APIs from metadata.provider.plex.tv to discover.provider.plex.tv
+    # Using direct HTTP avoids PlexAPI breakages.
+    base = "https://discover.provider.plex.tv"
+    url = f"{base}/library/sections/watchlist/all"
+    params = {
+        "includeCollections": "1",
+        "includeExternalMedia": "1",
+        "X-Plex-Token": user_token,
+    }
+    r = requests.get(url, params=params, timeout=20)
+    r.raise_for_status()
+    return r.text
 
-        for item in items:
-            gid = extract_guid_ids(getattr(item, "guids", None) or [])
-            if tmdb_id and gid.get("tmdb") == str(tmdb_id):
-                item.removeFromWatchlist()
+def _discover_remove_watchlist(self, user_token: str, rating_key: str) -> None:
+    base = "https://discover.provider.plex.tv"
+    url = f"{base}/actions/removeFromWatchlist"
+    params = {"ratingKey": rating_key, "X-Plex-Token": user_token}
+    r = requests.put(url, params=params, timeout=20)
+    r.raise_for_status()
+
+def remove_from_watchlist_if_present(
+    self,
+    user_token: str,
+    tmdb_id: Optional[int],
+    tvdb_id: Optional[int],
+    title: str,
+    year: Optional[int],
+) -> Tuple[bool, str]:
+    # Fetch watchlist from Plex Discover API (XML)
+    try:
+        xml_text = self._discover_watchlist_xml(user_token)
+    except Exception as e:
+        return False, f"Failed to fetch watchlist: {e}"
+
+    target_title = norm_title(title)
+    try:
+        root = ET.fromstring(xml_text)
+    except Exception as e:
+        return False, f"Failed to parse watchlist XML: {e}"
+
+    # Entries are usually <Video> or <Directory> nodes with attributes incl. ratingKey, title, year, guid
+    candidates = list(root.iter())
+    for node in candidates:
+        rk = node.attrib.get("ratingKey") or node.attrib.get("ratingkey")
+        if not rk:
+            continue
+
+        node_title = norm_title(node.attrib.get("title", "") or "")
+        node_year = node.attrib.get("year")
+        guid = node.attrib.get("guid", "") or ""
+
+        # guid examples: "plex://movie/5d7768ba96b655001f3d9b7a?lang=en" or provider guids
+        # There are also nested <Guid id="..."> nodes.
+        gids = {"raw": guid}
+        # extract ids from guid string + nested Guid tags
+        if guid:
+            # reuse existing helper by faking guids list shape when possible
+            try:
+                tmp = extract_guid_ids([{"id": guid}])  # type: ignore[arg-type]
+                gids.update(tmp)
+            except Exception:
+                pass
+
+        for g in node.findall(".//Guid"):
+            gid = g.attrib.get("id") or ""
+            if gid:
+                try:
+                    tmp = extract_guid_ids([{"id": gid}])  # type: ignore[arg-type]
+                    gids.update(tmp)
+                except Exception:
+                    continue
+
+        if tmdb_id and (gids.get("tmdb") == str(tmdb_id)):
+            try:
+                self._discover_remove_watchlist(user_token, rk)
                 return True, f"Removed by TMDB {tmdb_id}"
-            if tvdb_id and gid.get("tvdb") == str(tvdb_id):
-                item.removeFromWatchlist()
+            except Exception as e:
+                return False, f"Remove failed (TMDB match): {e}"
+
+        if tvdb_id and (gids.get("tvdb") == str(tvdb_id)):
+            try:
+                self._discover_remove_watchlist(user_token, rk)
                 return True, f"Removed by TVDB {tvdb_id}"
+            except Exception as e:
+                return False, f"Remove failed (TVDB match): {e}"
 
-            i_title = norm_title(getattr(item, "title", "") or "")
-            i_year = getattr(item, "year", None)
-            if i_title == target_title and (year is None or (i_year is not None and int(i_year) == int(year))):
-                item.removeFromWatchlist()
-                return True, "Removed by title/year fallback"
+        # Fallback: title/year
+        if node_title and node_title == target_title:
+            if year is None:
+                try:
+                    self._discover_remove_watchlist(user_token, rk)
+                    return True, "Removed by title fallback"
+                except Exception as e:
+                    return False, f"Remove failed (title match): {e}"
+            else:
+                try:
+                    if node_year and int(node_year) == int(year):
+                        self._discover_remove_watchlist(user_token, rk)
+                        return True, "Removed by title/year fallback"
+                except Exception:
+                    pass
 
-        return False, "Not on watchlist"
+    return False, "Not on watchlist"
